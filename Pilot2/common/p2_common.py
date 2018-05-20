@@ -8,6 +8,13 @@ import sys
 import gzip
 import argparse
 import glob
+try:
+    reload  # Python 2.7
+except NameError:
+    try:
+        from importlib import reload  # Python 3.4+
+    except ImportError:
+        from imp import reload  # Python 3.0 - 3.3
 
 from sklearn.preprocessing import Imputer
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler
@@ -522,7 +529,7 @@ def get_list_of_data_files(GP):
     data_file = get_file(data_set, origin='http://ftp.mcs.anl.gov/pub/candle/public/benchmarks/Pilot2/'+data_set+'.tar.gz', untar=True, md5_hash=data_hash)
     data_dir = os.path.join(os.path.dirname(data_file), data_set)
     ## Make a list of all of the data files in the data set
-    data_files=glob.glob('%s/*.npy'%data_dir)
+    data_files=glob.glob('%s/*.npz'%data_dir)
 
     fields = p2.gen_data_set_dict()
 
