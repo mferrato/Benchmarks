@@ -1,0 +1,17 @@
+cd Benchmarks/
+git branch -a
+git checkout data_parallel
+
+# optional if remote state is desired
+git pull
+
+# make sure on data_parallel branch
+git status
+
+# merge remote/frameworks into local/data_parallel
+git merge origin/frameworks
+
+# push updated data_parallel branch to remote`
+git status
+git push
+
