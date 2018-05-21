@@ -56,10 +56,10 @@ def set_seed(seed):
 
         # Uncommit when running on an optimized tensorflow where NUM_INTER_THREADS and
         # NUM_INTRA_THREADS env vars are set.
-        # session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
-        #	intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
-        # sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-        # K.set_session(sess)
+        session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
+        	intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
+        sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+        K.set_session(sess)
 
 
 def verify_path(path):
@@ -302,6 +302,15 @@ class Struct:
 
 
 def run(params):
+    # Initialize hovorod
+    hvd.init()
+
+    # Pin GPU to be used to process local rank (one GPU per process)
+    config=tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.gpu_options.visible_device_list = str(hvd.local_rank())
+    K.set_session(tf.Session(config=config))
+
     args = Struct(**params)
     set_seed(args.rng_seed)
     ext = extension_from_parameters(args)
@@ -380,7 +389,12 @@ def run(params):
         model = build_model(loader, args, silent=True)
 
         optimizer = optimizers.deserialize({'class_name': args.optimizer, 'config': {}})
+        optimizer = hvd.DistributedOptimizer(optimizer)
+
+        # if base_lr is in args, use it, otherwuse use optimizer default lr
         base_lr = args.base_lr or K.get_value(optimizer.lr)
+
+        # if lr in args, use it as the optimizer learning rate
         if args.learning_rate:
             K.set_value(optimizer.lr, args.learning_rate)
 
