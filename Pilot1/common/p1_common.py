@@ -200,6 +200,10 @@ def get_p1_common_parser(parser):
                         help="run id")
 
 
+    # Inference options
+    parser.add_argument("--shuffle_col", type=int,
+                         default=argparse.SUPPRESS,
+                         help="column in dataframe to shuffle")
     return parser
 
 
