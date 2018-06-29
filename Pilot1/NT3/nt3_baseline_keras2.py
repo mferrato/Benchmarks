@@ -268,7 +268,7 @@ def run(gParameters):
 
     score = model.evaluate(X_test, Y_test, verbose=0)
 
-    if False:
+    if True:
         print('Test score:', score[0])
         print('Test accuracy:', score[1])
         # serialize model to JSON
