@@ -175,7 +175,7 @@ print("Loaded json model from disk")
 end = time.time()
 print ('loading model elapsed time in seconds: ', end - start)
 
-# load the test dataA
+# loaad test and train data as samples to infer ond
 print (str(datetime.now()),  " loading data")
 start = time.time()
 file_train = gParameters['train_data']
@@ -184,11 +184,9 @@ url = gParameters['data_url']
 
 train_file = data_utils.get_file(file_train, url+file_train, cache_subdir='Pilot1')
 test_file = data_utils.get_file(file_test, url+file_test, cache_subdir='Pilot1')
-
 X_train, Y_train, X_test, Y_test = load_data(train_file, test_file, gParameters)
-
-# perform predictions on merged train and test data
 X = np.concatenate((X_train, X_test), axis=0)
+
 print ('X shape: ', X.shape)
 print (str(datetime.now()),  " done loading data")
 end = time.time()
@@ -199,7 +197,7 @@ X = np.expand_dims(X, axis=2)
 print('X shape" ', X.shape)
 
 # shuffle a column if looking at feature importance
-if True:
+if 'shuffle_col' in gParameters:
     print(str(datetime.now()),  " shuffling column ", gParameters['shuffle_col'])
     X[gParameters['shuffle_col']] = np.random.permutation(X[gParameters['shuffle_col']])
 
