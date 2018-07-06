@@ -23,6 +23,8 @@ from keras.utils.vis_utils import plot_model
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import KFold, StratifiedKFold, GroupKFold
 from scipy.stats.stats import pearsonr
+import horovod.keras as hvd
+import tensorflow as tf
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -48,7 +50,6 @@ def set_seed(seed):
     random.seed(seed)
 
     if K.backend() == 'tensorflow':
-        import tensorflow as tf
         tf.set_random_seed(seed)
         # session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
         # sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
@@ -56,8 +57,11 @@ def set_seed(seed):
 
         # Uncommit when running on an optimized tensorflow where NUM_INTER_THREADS and
         # NUM_INTRA_THREADS env vars are set.
+        print("setting inter_op_parallelism_threads to ", os.environ['NUM_INTER_THREADS'])
+        print("setting intra_op_parallelism_threads to ", os.environ['NUM_INTRA_THREADS'])
         session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
-        	intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
+        	                      intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
+        session_conf.allow_soft_placement = True
         sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
         K.set_session(sess)
 
@@ -374,6 +378,7 @@ def run(params):
         if epoch <= 5:
             K.set_value(model.optimizer.lr, (base_lr * (5-epoch) + lr * epoch) / 5)
         logger.debug('Epoch {}: lr={:.5g}'.format(epoch, K.get_value(model.optimizer.lr)))
+        print ('warmup learn_rate retuned by warmup_scheduler = ', K.get_value(model.optimizer.lr))
         return K.get_value(model.optimizer.lr)
 
     df_pred_list = []
@@ -389,14 +394,22 @@ def run(params):
         model = build_model(loader, args, silent=True)
 
         optimizer = optimizers.deserialize({'class_name': args.optimizer, 'config': {}})
-        optimizer = hvd.DistributedOptimizer(optimizer)
-
-        # if base_lr is in args, use it, otherwuse use optimizer default lr
-        base_lr = args.base_lr or K.get_value(optimizer.lr)
 
         # if lr in args, use it as the optimizer learning rate
         if args.learning_rate:
-            K.set_value(optimizer.lr, args.learning_rate)
+            # K.set_value(optimizer.lr, args.learning_rate * hvd.size())
+            K.set_value(optimizer.lr, args.learning_rate )
+        else:
+            # K.set_value(optimizer.lr, K.get_value(optimizer.lr) * hvd.size())
+            K.set_value(optimizer.lr, args.learning_rate )
+
+        # if base_lr is in args, use it, otherwise use optimizer default lr
+        #if args.base_lr:
+        #    base_lr = args.base_lr * hvd.size()
+        #else:
+        #    base_lr = K.get_value(optimizer.lr)
+        base_lr = K.get_value(optimizer.lr)
+        optimizer = hvd.DistributedOptimizer(optimizer)
 
         model.compile(loss=args.loss, optimizer=optimizer, metrics=[mae, r2])
 
@@ -415,17 +428,26 @@ def run(params):
 
         # callbacks = [history_logger, model_recorder]
         callbacks = [candle_monitor, timeout_monitor, history_logger, model_recorder]
+        callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
+        callbacks.append(hvd.callbacks.MetricAverageCallback())
+
         if args.reduce_lr:
             callbacks.append(reduce_lr)
         if args.warmup_lr:
             callbacks.append(warmup_lr)
         if args.cp:
-            callbacks.append(checkpointer)
+            if hvd.rank() == 0:
+                callbacks.append(checkpointer)
         if args.tb:
             callbacks.append(tensorboard)
 
-        train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
+        print ('hvd rank: ', hvd.rank())
+        print ('hvd local rank: ', hvd.local_rank())
+        print ('hvd size: ', hvd.size())
+        print ('init lr: ', K.get_value(model.optimizer.lr))
+
+        train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle, rank=hvd.rank(), total_ranks=hvd.size())
+        val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle, rank=hvd.rank(), total_ranks=hvd.size())
 
         df_val = val_gen.get_response(copy=True)
         y_val = df_val['Growth'].values
