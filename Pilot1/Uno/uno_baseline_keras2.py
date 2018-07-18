@@ -368,6 +368,10 @@ def run(params):
     model.summary(print_fn=logger.info)
     # plot_model(model, to_file=prefix+'.model.png', show_shapes=True)
 
+    if hasattr(args, 'weights'):
+        model.load_weights(args.weights)
+        print("Loaded model from disk")
+
     if args.cp:
         model_json = model.to_json()
         with open(prefix+'.model.json', 'w') as f:
@@ -392,6 +396,9 @@ def run(params):
             cv_ext = '.cv{}'.format(fold+1)
 
         model = build_model(loader, args, silent=True)
+        if hasattr(args, 'weights'):
+            model.load_weights(args.weights)
+            print("Loaded model from disk")
 
         optimizer = optimizers.deserialize({'class_name': args.optimizer, 'config': {}})
 
