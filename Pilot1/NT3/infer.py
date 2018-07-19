@@ -154,9 +154,11 @@ X_test = np.expand_dims(X_test, axis=2)
 print('X_test shape" ', X_test.shape)
 
 # shuffle a column if looking at feature importance
+fileprefix = 'out'
 if 'shuffle_col' in gParameters:
     print(str(datetime.now()),  " shuffling column ", gParameters['shuffle_col'])
     X_test[gParameters['shuffle_col']] = np.random.permutation(X_test[gParameters['shuffle_col']])
+    fileprefix = fileprefix + '.' + str(gParameters['shuffle_col'])
 
 # do prediction
 loaded_model_json.compile(loss=gParameters['loss'],
@@ -164,7 +166,11 @@ loaded_model_json.compile(loss=gParameters['loss'],
     metrics=[gParameters['metrics']])
 prediction = loaded_model_json.predict(X_test, verbose=0)
 print( prediction )
+
+index = np.array([])
 for row in prediction:
     print (np.argmax(row))
- 
+    index = np.append(index, [np.argmax(row)])
+
+np.savetxt(fileprefix, index, '%d')
 print (str(datetime.now()),  " done")
