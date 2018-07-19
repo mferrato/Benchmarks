@@ -113,6 +113,10 @@ def get_p1_common_parser(parser):
 
 
     # Model definition
+    parser.add_argument("--weights",
+                         default=argparse.SUPPRESS, type=str,
+                         help="file of weights to initialize model with")
+
     # Model Architecture
     parser.add_argument("--conv", nargs='+', type=int,
                         default=argparse.SUPPRESS,
