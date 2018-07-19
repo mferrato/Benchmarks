@@ -13,13 +13,11 @@ except ImportError:
     import ConfigParser as configparser
 
 from keras import backend as K
-
 from keras.layers import Input, Dense, Dropout, Activation, Conv1D, MaxPooling1D, Flatten
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.models import Sequential, Model, model_from_json, model_from_yaml
 from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint, CSVLogger, ReduceLROnPlateau
-
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler
 
@@ -34,7 +32,6 @@ sys.path.append(lib_path2)
 
 import data_utils
 import p1_common, p1_common_keras
-
 from keras.models import Sequential, Model, model_from_json, model_from_yaml
 from sklearn.metrics import accuracy_score
 
@@ -48,7 +45,6 @@ def common_parser(parser):
     # and all the other options
     parser = p1_common.get_default_neon_parse(parser)
     parser = p1_common.get_p1_common_parser(parser)
-
     return parser
 
 def get_nt3_parser():
@@ -91,34 +87,12 @@ def read_config_file(file):
     return fileParams
 
 def initialize_parameters():
-    # Get command-line parameters
     parser = get_nt3_parser()
     args = parser.parse_args()
-    #print('Args:', args)
-    # Get parameters from configuration file
     fileParameters = read_config_file(args.config_file)
     print ('Params:', fileParameters)
-    # Consolidate parameter set. Command-line parameters overwrite file configuration
     gParameters = p1_common.args_overwrite_config(args, fileParameters)
     return gParameters
-
-# output_dir = 'NT3'
-# model_name = 'nt3'
-# optimizer = 'sgd'
-# loss = 'categorical_crossentropy'
-# metrics = 'accuracy'
-# data_url = 'ftp://ftp.mcs.anl.gov/pub/candle/public/benchmarks/Pilot1/normal-tumor/'
-# train_data = 'nt_train2.csv'
-# test_data = 'nt_test2.csv'
-# classes=2
-# gParameters = {}
-# gParameters['loss'] = loss
-# gParameters['optimizer'] = optimizer
-# gParameters['metrics'] = metrics
-# gParameters['train_data'] = train_data
-# gParameters['test_data'] = test_data
-# gParameters['data_url'] = data_url
-# gParameters['classes'] = classes
 
 gParameters = initialize_parameters()
 print('learning_rate is ', gParameters['learning_rate'])
@@ -127,11 +101,8 @@ print('output_dir is ', gParameters['output_dir'])
 
 # todo: enable user to specify csv file to load.
 def load_data(train_path, test_path, gParameters):
-
-    print('Loading data...')
     df_train = (pd.read_csv(train_path,header=None).values).astype('float32')
     df_test = (pd.read_csv(test_path,header=None).values).astype('float32')
-    print('done')
 
     print('df_train shape:', df_train.shape)
     print('df_test shape:', df_test.shape)
@@ -159,25 +130,16 @@ def load_data(train_path, test_path, gParameters):
 
     return X_train, Y_train, X_test, Y_test
 
-
 # load json and create model
-print (str(datetime.now()),  " loading model")
-start = time.time()
 json_file = open('{}/{}.model.json'.format(gParameters['output_dir'], gParameters['model_name']), 'r')
 loaded_model_json = json_file.read()
 json_file.close()
 loaded_model_json = model_from_json(loaded_model_json)
 
 # load weights into new model
-print (str(datetime.now()),  " loading weights")
 loaded_model_json.load_weights('{}/{}.weights.h5'.format(gParameters['output_dir'], gParameters['model_name']))
-print("Loaded json model from disk")
-end = time.time()
-print ('loading model elapsed time in seconds: ', end - start)
 
 # loaad test and train data as samples to infer ond
-print (str(datetime.now()),  " loading data")
-start = time.time()
 file_train = gParameters['train_data']
 file_test = gParameters['test_data']
 url = gParameters['data_url']
@@ -185,32 +147,24 @@ url = gParameters['data_url']
 train_file = data_utils.get_file(file_train, url+file_train, cache_subdir='Pilot1')
 test_file = data_utils.get_file(file_test, url+file_test, cache_subdir='Pilot1')
 X_train, Y_train, X_test, Y_test = load_data(train_file, test_file, gParameters)
-X = np.concatenate((X_train, X_test), axis=0)
-
-print ('X shape: ', X.shape)
-print (str(datetime.now()),  " done loading data")
-end = time.time()
-print ('loading data elapsed time in seconds: ', end - start)
+print ('X_test shape: ', X_test.shape)
 
 # this reshaping is critical for the Conv1D to work
-X = np.expand_dims(X, axis=2)
-print('X shape" ', X.shape)
+X_test = np.expand_dims(X_test, axis=2)
+print('X_test shape" ', X_test.shape)
 
 # shuffle a column if looking at feature importance
 if 'shuffle_col' in gParameters:
     print(str(datetime.now()),  " shuffling column ", gParameters['shuffle_col'])
-    X[gParameters['shuffle_col']] = np.random.permutation(X[gParameters['shuffle_col']])
+    X_test[gParameters['shuffle_col']] = np.random.permutation(X_test[gParameters['shuffle_col']])
 
 # do prediction
-print (str(datetime.now()),  " performing inference")
-start = time.time()
 loaded_model_json.compile(loss=gParameters['loss'],
     optimizer=gParameters['optimizer'],
     metrics=[gParameters['metrics']])
-prediction = loaded_model_json.predict(X, verbose=0)
-print (str(datetime.now()),  " done performing inferendce")
-end = time.time()
-print('prediction on ', X.shape[0], ' samples elapsed time in seconds: ', end - start)
+prediction = loaded_model_json.predict(X_test, verbose=0)
 print( prediction )
-
+for row in prediction:
+    print (np.argmax(row))
+ 
 print (str(datetime.now()),  " done")
