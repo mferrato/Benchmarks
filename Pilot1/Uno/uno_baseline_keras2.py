@@ -49,21 +49,21 @@ def set_seed(seed):
 
     random.seed(seed)
 
-    if K.backend() == 'tensorflow':
-        tf.set_random_seed(seed)
+   # if K.backend() == 'tensorflow':
+        # tf.set_random_seed(seed)
         # session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
         # sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
         # K.set_session(sess)
 
         # Uncommit when running on an optimized tensorflow where NUM_INTER_THREADS and
         # NUM_INTRA_THREADS env vars are set.
-        print("setting inter_op_parallelism_threads to ", os.environ['NUM_INTER_THREADS'])
-        print("setting intra_op_parallelism_threads to ", os.environ['NUM_INTRA_THREADS'])
-        session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
-        	                      intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
-        session_conf.allow_soft_placement = True
-        sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-        K.set_session(sess)
+        #print("setting inter_op_parallelism_threads to ", os.environ['NUM_INTER_THREADS'])
+        #print("setting intra_op_parallelism_threads to ", os.environ['NUM_INTRA_THREADS'])
+        #session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
+        #	                      intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
+        #session_conf.allow_soft_placement = True
+        #sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+        #K.set_session(sess)
 
 
 def verify_path(path):
@@ -379,7 +379,7 @@ def run(params):
 
     def warmup_scheduler(epoch):
         lr = args.learning_rate or base_lr * args.batch_size/100
-        if epoch <= 5:
+        if epoch > 5:
             K.set_value(model.optimizer.lr, (base_lr * (5-epoch) + lr * epoch) / 5)
         logger.debug('Epoch {}: lr={:.5g}'.format(epoch, K.get_value(model.optimizer.lr)))
         print ('warmup learn_rate retuned by warmup_scheduler = ', K.get_value(model.optimizer.lr))
@@ -404,17 +404,18 @@ def run(params):
 
         # if lr in args, use it as the optimizer learning rate
         if args.learning_rate:
-            # K.set_value(optimizer.lr, args.learning_rate * hvd.size())
-            K.set_value(optimizer.lr, args.learning_rate )
+            K.set_value(optimizer.lr, args.learning_rate * hvd.size())
+            #K.set_value(optimizer.lr, args.learning_rate )
         else:
-            # K.set_value(optimizer.lr, K.get_value(optimizer.lr) * hvd.size())
-            K.set_value(optimizer.lr, args.learning_rate )
+            K.set_value(optimizer.lr, K.get_value(optimizer.lr) * hvd.size())
+            #K.set_value(optimizer.lr, args.learning_rate )
 
         # if base_lr is in args, use it, otherwise use optimizer default lr
         #if args.base_lr:
         #    base_lr = args.base_lr * hvd.size()
         #else:
         #    base_lr = K.get_value(optimizer.lr)
+
         base_lr = K.get_value(optimizer.lr)
         optimizer = hvd.DistributedOptimizer(optimizer)
 
@@ -476,6 +477,7 @@ def run(params):
             history = model.fit_generator(train_gen.flow(single=args.single), train_gen.steps,
                                           epochs=args.epochs,
                                           callbacks=callbacks,
+                                          verbose=2,
                                           validation_data=val_gen.flow(single=args.single),
                                           validation_steps=val_gen.steps)
 
