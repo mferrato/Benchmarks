@@ -1,6 +1,7 @@
 from __future__ import print_function
 import pandas as pd
 import numpy as np
+import keras
 import os
 import sys
 from datetime import datetime
@@ -37,6 +38,22 @@ import p1_common, p1_common_keras
 
 from keras.models import Sequential, Model, model_from_json, model_from_yaml
 from sklearn.metrics import accuracy_score
+
+parser = argparse.ArgumentParser()
+parser.add_argument("count", help="Number of times to perform prediction",
+                    type=int)
+args = parser.parse_args()
+
+class PermanentDropout(keras.layers.Dropout):
+    def __init__(self, rate, **kwargs):
+        super(PermanentDropout, self).__init__(rate, **kwargs)
+        self.uses_learning_phase = False
+
+    def call(self, x, mask=None):
+        if 0. < self.rate < 1.:
+            noise_shape = self._get_noise_shape(x)
+            x = K.dropout(x, self.rate, noise_shape)
+        return x
 
 def load_data(train_path, test_path, gParameters):
 
@@ -98,7 +115,7 @@ start = time.time()
 json_file = open('{}/{}.model.json'.format(output_dir, model_name), 'r')
 loaded_model_json = json_file.read()
 json_file.close()
-loaded_model_json = model_from_json(loaded_model_json)
+loaded_model_json = model_from_json(loaded_model_json, {'PermanentDropout':PermanentDropout})
 
 # load weights into new model
 print (str(datetime.now()),  " loading weights")
@@ -107,7 +124,7 @@ print("Loaded json model from disk")
 end = time.time()
 print ('loading model elapsed time in seconds: ', end - start)
 
-# load the test dataA
+# load the test data
 print (str(datetime.now()),  " loading data")
 start = time.time()
 file_train = gParameters['train_data']
@@ -136,10 +153,34 @@ start = time.time()
 loaded_model_json.compile(loss=gParameters['loss'],
     optimizer=gParameters['optimizer'],
     metrics=[gParameters['metrics']])
-prediction = loaded_model_json.predict(X, verbose=0)
-print (str(datetime.now()),  " done performing inferendce")
+
+if args.count > 1:
+	
+	prediction = np.empty(shape=(args.count, X.shape[0], 2)) 
+
+	for i in range(args.count):
+		prediction[i] = loaded_model_json.predict(X, verbose=0)
+
+	#Performs series of operations
+	mean_array = np.mean(prediction, axis=0)
+	min_array = np.min(prediction, axis=0)
+	max_array = np.max(prediction, axis=0)
+	std_array = np.std(prediction, axis=0)
+	var_array = np.var(prediction, axis=0)
+	
+#	d = {'Predicted Mean': mean_array, 'Maximum Value': max_array, 'Minimum Value': min_array, 'Standard Deviation': std_array, 'Variance': var_array}
+#	result_table = pd.DataFrame(data=d, index=range(1400))
+#	print(result_table)
+#	result_file_name='nt3_inference_results.csv'
+#	result_table.to_csv(result_file_name, sep='\t')
+
+else: 
+	prediction = loaded_model_json.predict(X, verbose=0)	
+
+print (str(datetime.now()),  " done performing inference")
 end = time.time()
 print('prediction on ', X.shape[0], ' samples elapsed time in seconds: ', end - start)
 print( prediction )
 
 print (str(datetime.now()),  " done")
+

@@ -12,7 +12,7 @@ except ImportError:
 
 from keras import backend as K
 
-from keras.layers import Input, Dense, Dropout, Activation, Conv1D, MaxPooling1D, Flatten
+from keras.layers import Input, Dense, Dropout, Activation, Conv1D, MaxPooling1D, Flatten, Lambda
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.models import Sequential, Model, model_from_json, model_from_yaml
 from keras.utils import np_utils
@@ -21,7 +21,7 @@ from keras.callbacks import ModelCheckpoint, CSVLogger, ReduceLROnPlateau
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler
 
-TIMEOUT=3600 # in sec; set this to -1 for no timeout 
+TIMEOUT=-1 # in sec; set this to -1 for no timeout 
 file_path = os.path.dirname(os.path.realpath(__file__))
 lib_path = os.path.abspath(os.path.join(file_path, '..', 'common'))
 sys.path.append(lib_path)
@@ -44,6 +44,18 @@ from solr_keras import CandleRemoteMonitor, compute_trainable_params, TerminateO
 #PL = 60484   # 1 + 60483 these are the width of the RNAseq datasets
 #P     = 60483   # 60483
 #DR    = 0.1      # Dropout rate
+
+class PermanentDropout(Dropout):
+    def __init__(self, rate, **kwargs):
+        super(PermanentDropout, self).__init__(rate, **kwargs)
+        self.uses_learning_phase = False
+
+    def call(self, x, mask=None):
+        if 0. < self.rate < 1.:
+            noise_shape = self._get_noise_shape(x)
+            x = K.dropout(x, self.rate, noise_shape)
+        return x
+
 
 def common_parser(parser):
 
@@ -89,6 +101,7 @@ def read_config_file(file):
     fileParams['classes'] = eval(config.get(section[0],'classes'))
     fileParams['pool'] = eval(config.get(section[0],'pool'))
     fileParams['save'] = eval(config.get(section[0], 'save'))
+    fileParams['permanent_drop'] = eval(config.get(section[0], 'permanent_drop'))
 
     # parse the remaining values
     for k,v in config.items(section[0]):
@@ -209,8 +222,11 @@ def run(gParameters):
         if layer:
             model.add(Dense(layer))
             model.add(Activation(gParameters['activation']))
-            if gParameters['drop']:
-                    model.add(Dropout(gParameters['drop']))
+	    if gParameters['drop']:
+		    if gParameters['permanent_drop']:
+			model.add(PermanentDropout(gParameters['drop']))
+		    else:
+                    	model.add(Dropout(gParameters['drop']))
     model.add(Dense(gParameters['classes']))
     model.add(Activation(gParameters['out_act']))
 
@@ -268,7 +284,7 @@ def run(gParameters):
 
     score = model.evaluate(X_test, Y_test, verbose=0)
 
-    if False:
+    if True:
         print('Test score:', score[0])
         print('Test accuracy:', score[1])
         # serialize model to JSON
@@ -277,9 +293,9 @@ def run(gParameters):
             json_file.write(model_json)
 
         # serialize model to YAML
-        model_yaml = model.to_yaml()
-        with open("{}/{}.model.yaml".format(output_dir, model_name), "w") as yaml_file:
-            yaml_file.write(model_yaml)
+       # model_yaml = model.to_yaml()
+       # with open("{}/{}.model.yaml".format(output_dir, model_name), "w") as yaml_file:
+       #     yaml_file.write(model_yaml)
 
         # serialize weights to HDF5
         model.save_weights("{}/{}.weights.h5".format(output_dir, model_name))
@@ -289,14 +305,14 @@ def run(gParameters):
         json_file = open('{}/{}.model.json'.format(output_dir, model_name), 'r')
         loaded_model_json = json_file.read()
         json_file.close()
-        loaded_model_json = model_from_json(loaded_model_json)
+        loaded_model_json = model_from_json(loaded_model_json, {'PermanentDropout': PermanentDropout})
 
 
         # load yaml and create model
-        yaml_file = open('{}/{}.model.yaml'.format(output_dir, model_name), 'r')
-        loaded_model_yaml = yaml_file.read()
-        yaml_file.close()
-        loaded_model_yaml = model_from_yaml(loaded_model_yaml)
+       # yaml_file = open('{}/{}.model.yaml'.format(output_dir, model_name), 'r')
+       # loaded_model_yaml = yaml_file.read()
+       # yaml_file.close()
+       # loaded_model_yaml = model_from_yaml(loaded_model_yaml)
 
 
         # load weights into new model
@@ -315,19 +331,19 @@ def run(gParameters):
         print("json %s: %.2f%%" % (loaded_model_json.metrics_names[1], score_json[1]*100))
 
         # load weights into new model
-        loaded_model_yaml.load_weights('{}/{}.weights.h5'.format(output_dir, model_name))
-        print("Loaded yaml model from disk")
+       # loaded_model_yaml.load_weights('{}/{}.weights.h5'.format(output_dir, model_name))
+       # print("Loaded yaml model from disk")
 
         # evaluate loaded model on test data
-        loaded_model_yaml.compile(loss=gParameters['loss'],
-            optimizer=gParameters['optimizer'],
-            metrics=[gParameters['metrics']])
-        score_yaml = loaded_model_yaml.evaluate(X_test, Y_test, verbose=0)
+        #loaded_model_yaml.compile(loss=gParameters['loss'],
+        #    optimizer=gParameters['optimizer'],
+        #    metrics=[gParameters['metrics']])
+       # score_yaml = loaded_model_yaml.evaluate(X_test, Y_test, verbose=0)
 
-        print('yaml Test score:', score_yaml[0])
-        print('yaml Test accuracy:', score_yaml[1])
+       # print('yaml Test score:', score_yaml[0])
+       # print('yaml Test accuracy:', score_yaml[1])
 
-        print("yaml %s: %.2f%%" % (loaded_model_yaml.metrics_names[1], score_yaml[1]*100))
+      #  print("yaml %s: %.2f%%" % (loaded_model_yaml.metrics_names[1], score_yaml[1]*100))
 
     return history
 

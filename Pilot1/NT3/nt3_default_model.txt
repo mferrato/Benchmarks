@@ -14,6 +14,7 @@ epochs=400
 batch_size=20
 learning_rate=0.001
 drop=0.1
+permanent_drop=True
 classes=2
 pool=[1, 10]
 save='.'
