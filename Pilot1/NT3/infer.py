@@ -112,14 +112,14 @@ gParameters['classes'] = classes
 # load json and create model
 print (str(datetime.now()),  " loading model")
 start = time.time()
-json_file = open('{}/{}.model.json'.format(output_dir, model_name), 'r')
+json_file = open('{}.model.json'.format(model_name), 'r')
 loaded_model_json = json_file.read()
 json_file.close()
 loaded_model_json = model_from_json(loaded_model_json, {'PermanentDropout':PermanentDropout})
 
 # load weights into new model
 print (str(datetime.now()),  " loading weights")
-loaded_model_json.load_weights('{}/{}.weights.h5'.format(output_dir, model_name))
+loaded_model_json.load_weights('{}.weights.h5'.format(model_name))
 print("Loaded json model from disk")
 end = time.time()
 print ('loading model elapsed time in seconds: ', end - start)
