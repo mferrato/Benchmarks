@@ -159,7 +159,7 @@ if args.count > 1:
 	prediction = np.empty(shape=(args.count, X.shape[0], 2)) 
 
 	for i in range(args.count):
-		prediction[i] = loaded_model_json.predict(X, verbose=0)
+        	prediction[i] = loaded_model_json.predict(X, verbose=0)
 
 	#Performs series of operations
 	mean_array = np.mean(prediction, axis=0)
@@ -167,20 +167,21 @@ if args.count > 1:
 	max_array = np.max(prediction, axis=0)
 	std_array = np.std(prediction, axis=0)
 	var_array = np.var(prediction, axis=0)
-	
-#	d = {'Predicted Mean': mean_array, 'Maximum Value': max_array, 'Minimum Value': min_array, 'Standard Deviation': std_array, 'Variance': var_array}
-#	result_table = pd.DataFrame(data=d, index=range(1400))
-#	print(result_table)
-#	result_file_name='nt3_inference_results.csv'
-#	result_table.to_csv(result_file_name, sep='\t')
 
+	d = {'Predicted Mean Tumor': mean_array[:,0], 'Predicted Mean Normal': mean_array[:,1], 'Maximum Value Tumor': max_array[:,0], 'Maximum Value Normal': max_array[:,1], 'Minimum Value Tumor': min_array[:,0], 'Minimum Value Normal': min_array[:,1], 'Standard Deviation': std_array[:,1], 'Variance': var_array[:,0]}
+	result_table = pd.DataFrame(data=d, index=range(1400))
+	print(result_table)
+	result_file_name='nt3_inference_results.csv'
+	result_table.to_csv(result_file_name, sep='\t')
+	print(str(datetime.now()), " done performing inference")
+	end =time.time()
+	print('prediction on ', X.shape[0], ' samples elapsed time in seconds: ', end - start)
 else: 
 	prediction = loaded_model_json.predict(X, verbose=0)	
-
-print (str(datetime.now()),  " done performing inference")
-end = time.time()
-print('prediction on ', X.shape[0], ' samples elapsed time in seconds: ', end - start)
-print( prediction )
+	print (str(datetime.now()),  " done performing inference")
+	end = time.time()
+	print('prediction on ', X.shape[0], ' samples elapsed time in seconds: ', end - start)
+	print( prediction )
 
 print (str(datetime.now()),  " done")
 
