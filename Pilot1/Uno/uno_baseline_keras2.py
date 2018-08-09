@@ -379,7 +379,7 @@ def run(params):
 
     def warmup_scheduler(epoch):
         lr = args.learning_rate or base_lr * args.batch_size/100
-        if epoch > 5:
+        if epoch < 5:
             K.set_value(model.optimizer.lr, (base_lr * (5-epoch) + lr * epoch) / 5)
         logger.debug('Epoch {}: lr={:.5g}'.format(epoch, K.get_value(model.optimizer.lr)))
         print ('warmup learn_rate retuned by warmup_scheduler = ', K.get_value(model.optimizer.lr))
@@ -404,11 +404,11 @@ def run(params):
 
         # if lr in args, use it as the optimizer learning rate
         if args.learning_rate:
-            K.set_value(optimizer.lr, args.learning_rate * hvd.size())
-            #K.set_value(optimizer.lr, args.learning_rate )
+            #K.set_value(optimizer.lr, args.learning_rate * hvd.size())
+            K.set_value(optimizer.lr, args.learning_rate )
         else:
-            K.set_value(optimizer.lr, K.get_value(optimizer.lr) * hvd.size())
-            #K.set_value(optimizer.lr, args.learning_rate )
+            #K.set_value(optimizer.lr, K.get_value(optimizer.lr) * hvd.size())
+            K.set_value(optimizer.lr, args.learning_rate )
 
         # if base_lr is in args, use it, otherwise use optimizer default lr
         #if args.base_lr:
@@ -477,7 +477,7 @@ def run(params):
             history = model.fit_generator(train_gen.flow(single=args.single), train_gen.steps,
                                           epochs=args.epochs,
                                           callbacks=callbacks,
-                                          verbose=2,
+                                          verbose=1,
                                           validation_data=val_gen.flow(single=args.single),
                                           validation_steps=val_gen.steps)
 
